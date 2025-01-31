@@ -70,7 +70,7 @@ router.put("/:id", (req, res) => {
       }
 
       const noticiaActualizada = { id, titulo, descripcion, filial };
-      io.emit("noticiaActualizada", noticiaActualizada); // Notificar cambios
+      global.io.emit("noticiaActualizada", noticiaActualizada); // Notificar cambios
       res.json(noticiaActualizada);
     }
   );
