@@ -6,7 +6,7 @@ const db = mysql.createConnection({
   user: "root",
   password: "",
   database: "noticias_db",
-});
+}).promise();
 
 db.connect((err) => {
   if (err) {

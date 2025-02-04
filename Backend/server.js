@@ -1,4 +1,5 @@
- const express = require("express");
+require('dotenv').config();
+const express = require("express");
 const { body, validationResult } = require("express-validator");
 const cors = require("cors");
 const http = require("http");
@@ -7,6 +8,10 @@ const mysql = require("mysql2");
 const ping = require('ping');
 const noticiasRoutes = require('./Routes/noticias');
 const servidoresRoutes = require('./Routes/servidores');
+const loginRoutes = require('./Routes/login.js')
+const bcrypt = require('bcryptjs');
+const bodyParser = require('body-parser');
+const jwt = require('jsonwebtoken');
 const app = express();
 const port = 3000;
 
@@ -30,6 +35,7 @@ io.on('connect_error', (err) => {
   console.error('Error de conexión:', err);
 });
 global.io = io; // Definir `io` globalmente
+global.bcrypt = bcrypt; // Definir `bcript` globalmente
 // Middleware
 app.use(express.json());
 
@@ -39,16 +45,29 @@ const corsOptions = {
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE", // Métodos permitidos
   allowedHeaders: ["Content-Type", "Authorization"], // Headers permitidos
 };
+const password = 'admin'
+bcrypt.hash(password, 10, (err, hash) => {
+  if (err) {
+    console.error("Error al hashear la contraseña:", err);
+    return;
+  }
+  console.log("Contraseña hasheada:", hash);
+});
+console.log("admin")
+
 
 app.use(cors(corsOptions));
+app.use(bodyParser.json());
 
 // Rutas de ejemplo
 app.get("/", (req, res) => {
   res.send("CORS configurado correctamente");
 });
 
-
-
+const users = [
+  { id: 1, username: 'admin', password: bcrypt.hashSync('123456', 10) }
+];
+const secretKey = process.env.JWT_SECRET || 'secreto123';
 
 // Conexión inicial a MySQL (sin especificar base de datos)
 const db = mysql.createConnection({
@@ -97,13 +116,21 @@ db.connect((err) => {
       // Crear tabla de noticias si no existe
       const tablaNoticias = `
         CREATE TABLE IF NOT EXISTS noticias (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          titulo VARCHAR(255) NOT NULL,
-          descripcion TEXT NOT NULL,
-          filial VARCHAR(100) NOT NULL,
-          fecha DATETIME DEFAULT CURRENT_TIMESTAMP
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        titulo VARCHAR(255) NOT NULL,
+        descripcion TEXT NOT NULL,
+        filial VARCHAR(100) NOT NULL,
+        fecha DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `;
+      const tableUsuarios = `
+        CREATE TABLE IF NOT EXISTS usuarios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL
+        );
+       `;
       const tablaServidores = `
         CREATE TABLE IF NOT EXISTS servidores (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -116,6 +143,13 @@ db.connect((err) => {
           console.error("Error al crear la tabla:", err.message);
         } else {
           console.log("Tabla 'noticias' verificada o creada");
+        }
+      });
+      dbWithDatabase.query(tableUsuarios, (err, result) => {
+        if (err) {
+          console.error("Error al crear la tabla:", err.message);
+        } else {
+          console.log("Tabla 'Usuarios' verificada o creada");
         }
       });
       dbWithDatabase.query(tablaServidores, (err, result) => {
@@ -174,6 +208,7 @@ app.post('/api/SubirServ', (req, res) => {
 
 
 app.use("/api/noticias", noticiasRoutes);
+app.use("/api/login", loginRoutes);
 app.use("/api/servidores", servidoresRoutes);
 
 setInterval(async () => {
